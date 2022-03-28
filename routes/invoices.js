@@ -23,25 +23,19 @@ router.get("/", async function(req, res, next) {
 router.get("/:id", async function(req, res, next) {
     try {
         const {id} = req.params;
-        const result = await db.query(`SELECT * FROM invoices JOIN companies ON invoices.comp_code = companies.code WHERE id = $1`, [id])
+        const result = await db.query(
+            `SELECT * FROM invoices 
+            JOIN companies ON invoices.comp_code = companies.code 
+            WHERE id = $1`, [id])
         if (result.rows.length === 0) {
             throw new ExpressError(`Invoice with id of ${id} does not exist`, 404)
           }
-        const formattedObject = {
-            invoice: {
-                id: result.rows[0].id,
-                amt: result.rows[0].amt,
-                paid: result.rows[0].paid,
-                add_date: result.rows[0].add_date,
-                paid_date: result.rows[0].paid_date,
-                company: {
-                    code: result.rows[0].code,
-                    name: result.rows[0].name,
-                    description: result.rows[0].description
-                }
-            }
-        }
-        return res.json(formattedObject)
+
+        const {amt, paid, add_date, paid_date} = result.rows[0]
+        const {code, name, description} = result.rows[0]
+
+        return res.json({invoice: {id, amt, paid, add_date, paid_date, comapny: {code, name, description}}})
+        
     } catch(e) {
         return next(e)
     }
