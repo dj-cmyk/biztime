@@ -62,15 +62,53 @@ router.post("/", async function(req, res, next) {
 // If invoice cannot be found, returns a 404.
 // Needs to be passed in a JSON body of {amt}
 // Returns: {invoice: {id, comp_code, amt, paid, add_date, paid_date}}
+
+// 2ND PART
+// Needs to be passed in a JSON body of {amt, paid}
+// If paying unpaid invoice: sets paid_date to today
+// If un-paying: sets paid_date to null
+// Else: keep current paid_date
+// Returns: {invoice: {id, comp_code, amt, paid, add_date, paid_date}}
 router.put("/:id", async function(req, res, next) {
     try {
         const { id } = req.params;
-        const { amt } = req.body;
-        const result = await db.query('UPDATE invoices SET amt=$1 WHERE id=$2 RETURNING id, comp_code, amt, paid, add_date, paid_date', [amt, id])
-        if (result.rows.length === 0) {
+        const { amt, paid } = req.body;
+        // SELECT INVOICE BY ID
+        const inv = await db.query(`
+            SELECT id, amt, paid, paid_date FROM invoices  
+            WHERE id = $1`, [id])
+        if (inv.rows.length === 0) {
             throw new ExpressError(`Can't update invoice with id of ${id}`, 404)
         }
-        return res.send({ invoice: result.rows[0] })
+        if (inv.rows[0].paid) {      
+                let paid_date = null;
+                const result = await db.query(`
+                    UPDATE invoices 
+                    SET amt=$1, paid=$2, paid_date=$3 
+                    WHERE id=$4 
+                    RETURNING id, comp_code, amt, paid, add_date, paid_date`, [amt, paid, paid_date, id])
+                return res.send({ invoice: result.rows[0] })
+            
+        } else {
+            if (paid) {
+                let paid_date = new Date()
+                const result = await db.query(`
+                    UPDATE invoices 
+                    SET amt=$1, paid=$2, paid_date=$3 
+                    WHERE id=$4 
+                    RETURNING id, comp_code, amt, paid, add_date, paid_date`, 
+                    [amt, paid, paid_date, id])
+                return res.send({ invoice: result.rows[0] })
+            } else {
+                const result = await db.query(`
+                    UPDATE invoices 
+                    SET amt=$1 
+                    WHERE id=$2 
+                    RETURNING id, comp_code, amt, paid, add_date, paid_date`, 
+                    [amt, id])
+                return res.send({ invoice: result.rows[0] })
+            }  
+        }
     } catch(e) {
         return next(e)
     }

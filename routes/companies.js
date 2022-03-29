@@ -1,4 +1,5 @@
 const express = require('express');
+const slugify = require('slugify')
 const ExpressError = require("../expressError");
 const router = new express.Router();
 const db = require('../db');
@@ -8,12 +9,21 @@ const db = require('../db');
 //   Returns list of companies, like {companies: [{code, name}, ...]}
 router.get("/", async function(req, res, next) {
     try {
-      const result = await db.query("SELECT code, name FROM companies")
-      return res.json({companies: result.rows})
+        const result = await db.query(`
+            SELECT c.code, c.name, i.industry 
+            FROM companies AS c
+            JOIN companies_industries AS ci
+            ON c.code = ci.comp_code
+            JOIN industries AS i
+            ON ci.industry_code = i.code`)
+    
+      return res.json( { companies: result.rows}) 
+        //this is not returning the format that is required, but I don't know how to format better
     } catch(e){
       return next(e)
     }
   });
+
 
 
 //   GET /companies/[code]
@@ -43,8 +53,12 @@ router.get("/:code", async function(req, res, next) {
 //   Returns obj of new company: {company: {code, name, description}}
 router.post("/", async function(req, res, next) {
     try {
-        const { code, name, description } = req.body;
-        const results = await db.query('INSERT INTO companies (code, name, description) VALUES ($1, $2, $3) RETURNING code, name, description', [code, name, description]);
+        const { name, description } = req.body;
+        const code = slugify(name)
+        const results = await db.query(
+            `INSERT INTO companies (code, name, description) 
+            VALUES ($1, $2, $3) RETURNING code, name, description`, 
+            [code, name, description]);
         return res.status(201).json({ company: results.rows[0] })
     } catch(e) {
         return next(e)
